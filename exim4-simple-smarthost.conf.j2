@@ -1,0 +1,55 @@
+# {{ ansible_managed }}
+
+acl_smtp_rcpt              = acl_smtp_rcpt
+add_environment            =
+disable_ipv6               = true
+exim_path                  = {{ exim_binary }}
+gecos_name                 = $1
+gecos_pattern              = ^([^,:]*)
+host_lookup                = *
+ignore_bounce_errors_after = 1d
+keep_environment           =
+local_from_check           = false
+local_interfaces           = 127.0.0.1
+local_sender_retain        = true
+log_file_path              = :syslog
+log_selector               = +tls_peerdn +subject
+message_size_limit         = 50M
+primary_hostname           = {{ ansible_fqdn }}
+qualify_domain             = {{ primary_email_domain }}
+smtp_return_error_details  = true
+split_spool_directory      = true
+spool_directory            = {{ exim_spool_directory }}
+timeout_frozen_after       = 1h
+tls_advertise_hosts        =
+untrusted_set_sender       = *
+write_rejectlog            = false
+
+domainlist relaydomains = {% for domain in relaydomains | sort %}{{ domain }}{% if not loop.last %} : {% endif %}{% endfor %}
+
+begin acl
+
+acl_smtp_rcpt:
+
+    deny
+        message = Relay not permitted.
+        domains = ! +relaydomains
+
+    accept
+
+begin routers
+
+    smarthost:
+        driver = manualroute
+        domains = +relaydomains
+        transport = smarthost
+        route_list = * {{ smarthost }}
+
+begin transports
+
+    smarthost:
+        driver = smtp
+
+begin retry
+
+*   *   F,2h,15m; G,16h,1h,1.5; F,4d,6h
